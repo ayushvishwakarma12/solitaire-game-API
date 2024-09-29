@@ -33,7 +33,6 @@ public class Card {
         return imageUrl;
     }
 
-
     //Method to generate the URL for the card image
     private String generateImageUrl() {
 

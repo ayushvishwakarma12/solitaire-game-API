@@ -9,6 +9,7 @@ public class GameState {
     private List<LinkedList<Card>> foundation;
     private int score;
     private int moves;
+    private int completedSequence;
 
 
     public GameState() {
@@ -17,6 +18,7 @@ public class GameState {
         this.deck = new LinkedList<>();
         this.score = 0;
         this.moves = 0;
+        this.completedSequence = 0;
     }
 
     public List<LinkedList<Card>> getPiles() {
@@ -59,36 +61,12 @@ public class GameState {
         this.moves = moves;
     }
 
-    //Method to extract a valid sequence starting from the selected card
-    public List<Card> extractSequence(LinkedList<Card> pile, int startIndex) {
-        List<Card> sequence = new LinkedList<>();
-        sequence.add(pile.get(startIndex));
-
-        for (int i = startIndex + 1; i < pile.size(); i++) {
-            Card current = pile.get(i);
-            Card previous = pile.get(i - 1);
-
-            if (previous.getValue() - current.getValue() == 1) {
-                sequence.add(current);
-            } else {
-                break;
-            }
-        }
-        return sequence;
+    public int getCompletedSequence() {
+        return completedSequence;
     }
 
-    //Method to remove the sequence from the original pile
-    public void removeSequence(LinkedList<Card> pile, int startIndex) {
-        while (pile.size() > startIndex) {
-            pile.remove(startIndex);
-        }
-    }
-
-    // Method to move a sequence from one pile to another
-    public void moveSequence(LinkedList<Card> sourcePile, int startIndex, LinkedList<Card> destinationPile) {
-        List<Card> sequence = extractSequence(sourcePile, startIndex);
-        removeSequence(sourcePile, startIndex);
-        destinationPile.addAll(sequence);
+    public void setCompletedSequence(int completedSequence) {
+        this.completedSequence = completedSequence;
     }
 
 }

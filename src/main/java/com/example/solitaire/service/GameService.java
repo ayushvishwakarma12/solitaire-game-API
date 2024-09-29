@@ -3,27 +3,25 @@ package com.example.solitaire.service;
 import com.example.solitaire.model.Card;
 import com.example.solitaire.model.Deck;
 import com.example.solitaire.model.GameState;
-
-import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
 
 import java.util.LinkedList;
+import java.util.List;
 
 
-
+@Service
 public class GameService {
     private GameState gameState;
-
 
     public GameService() {
         this.gameState = new GameState();
         initializeGame();
     }
 
-    private void initializeGame() {
+    public void initializeGame() {
         Deck deck = new Deck();
         deck.shuffleDeck();
-
         gameState.setPiles(new LinkedList<>());
 
         for (int i = 0; i < 10; i++) {
@@ -34,9 +32,7 @@ public class GameService {
             int cardToDeal = (i < 4) ? 6 : 5;
             for (int j = 0; j < cardToDeal; j++) {
                 if (!deck.getCards().isEmpty()) {
-
                     Card card = deck.getCards().remove(deck.getCards().size() - 1);
-                    LoggerFactory.getLogger(GameService.class).info("card {}", card);
                     gameState.getPiles().get(i).add(card);
                 }
             }
@@ -45,21 +41,18 @@ public class GameService {
                 pile.getLast().setFaceUp(true);
             }
         }
+        for (Card card : deck.getCards()) {
+            card.setFaceUp(true);
+        }
+
         gameState.setDeck(new LinkedList<>(deck.getCards()));
+        gameState.setMoves(0);
         LoggerFactory.getLogger(GameService.class).info("Draw pile size: {}", gameState.getDeck().size());
     }
 
-    public void flipCard(int pileIndex, int cardIndex) {
-        if (pileIndex < 0 || pileIndex >= gameState.getPiles().size()) {
-            throw new IllegalArgumentException("Invalid pile index");
-        }
-
+    public void flipCard(int pileIndex) {
         LinkedList<Card> pile = gameState.getPiles().get(pileIndex);
-        if (cardIndex < 0 || cardIndex >= pile.size()) {
-            throw new IllegalArgumentException("Invalid card index");
-        }
-
-        Card card = pile.get(cardIndex);
+        Card card = pile.getLast();
         card.flip();
         LoggerFactory.getLogger(GameService.class).info("Flipped card: {}", card);
     }
@@ -82,16 +75,71 @@ public class GameService {
 
         LinkedList<Card> targetPile = gameState.getPiles().get(targetPileIndex);
 
+        // Get the sequence of cards to move
+        List<Card> cardsToMove = sourcePile.subList(sourceCardIndex, sourcePile.size());
+        LoggerFactory.getLogger(GameService.class).info("List length {} ", cardsToMove.size());
+        if (cardsToMove.size() > 1) {
+            if (!isValidSequenceMove(cardsToMove, targetPile)) {
+                throw new IllegalArgumentException("Invalid move sequence");
+            }
+            targetPile.addAll(cardsToMove);
+            sourcePile.subList(sourceCardIndex, sourcePile.size()).clear();
+            gameState.setMoves(gameState.getMoves() + 1);
+            if (!sourcePile.get(sourcePile.size() - 1).isFaceUp()) {
+                flipCard(sourcePileIndex);
+            }
 
-        if (!isValidMove(cardToMove, targetPile)) {
-            throw new IllegalArgumentException("Invalid move");
+        } else {
+            if (!isValidMove(cardToMove, targetPile)) {
+                throw new IllegalArgumentException("Invalid move");
+            }
+            sourcePile.remove(sourceCardIndex);
+            targetPile.add(cardToMove);
+            gameState.setMoves(gameState.getMoves() + 1);
+            if (!sourcePile.get(sourcePile.size() - 1).isFaceUp()) {
+                flipCard(sourcePileIndex);
+            }
         }
 
-        sourcePile.remove(sourceCardIndex);
-        targetPile.add(cardToMove);
-        // Add the card to the target pile
-        // Optionally, log the action
+        checkAndRemoveCompleteSequence();
+
         LoggerFactory.getLogger(GameService.class).info("Moved card: {} from pile {} to pile {}", cardToMove, sourcePileIndex, targetPileIndex);
+    }
+
+    public boolean isValidMove(Card cardToMove, LinkedList<Card> targetPile) {
+        if (targetPile.isEmpty()) {
+            return true;
+        }
+
+        Card topCard = targetPile.getLast();
+        int valueDifference = cardToMove.getValue() - topCard.getValue();
+
+        return valueDifference == -1;
+    }
+
+    public boolean isValidSequenceMove(List<Card> cardsToMove, LinkedList<Card> targetPile) {
+        if (targetPile.isEmpty()) {
+            return  true;
+        }
+        LoggerFactory.getLogger(GameService.class).info("Moved card: {} ", cardsToMove);
+        Card topCard = targetPile.getLast();
+        Card bottomCard = cardsToMove.get(0);
+        LoggerFactory.getLogger(GameService.class).info("Last card: {} ", bottomCard);
+
+        int valueDifference = bottomCard.getValue() - topCard.getValue();
+        LoggerFactory.getLogger(GameService.class).info("Card value: {} ", valueDifference);
+
+        if (valueDifference != -1) {
+            return false;
+        }
+
+        for (int i = 0; i < cardsToMove.size() - 1; i++) {
+            LoggerFactory.getLogger(GameService.class).info("Card value after difference: {} ", cardsToMove.get(i).getValue() - cardsToMove.get(i + 1).getValue());
+            if (cardsToMove.get(i).getValue() - cardsToMove.get(i + 1).getValue() != 1) {
+                return false;
+            }
+        }
+        return  true;
     }
 
 
@@ -99,20 +147,55 @@ public class GameService {
         return gameState;
     }
 
-    private boolean isValidMove(Card cardToMove, LinkedList<Card> targetPile) {
-        // Implement Solitaire move rules here. For example:
-        // - Check if target pile is empty (can only place a King)
-        // - Check if the card can be placed on the target pile (color/rank rules)
-
-        // Example: assuming targetPile is empty
-        if (targetPile.isEmpty()) {
-            return cardToMove.getValue() == 13; // Only Kings can be placed on empty piles
+    private boolean isKingToAceSequence(List<Card> cards) {
+        if (cards.size() < 13) {
+            return false;
         }
-        return  true;
 
+        for (int i = 0; i < 13; i++) {
+            if (cards.get(i).getValue() != (13 - i)) {
+                return false;
+            }
+        }
+        return true;
     }
 
+    private void checkAndRemoveCompleteSequence() {
+        for (int i = 0; i < gameState.getPiles().size(); i++) {
+            LinkedList<Card> pile = gameState.getPiles().get(i);
+            if (pile.size() >= 13) {
+                List<Card> possibleSequence = pile.subList(pile.size() - 13, pile.size());
+                if (isKingToAceSequence(possibleSequence)) {
+                    // Remove the sequence
+                    possibleSequence.clear();
+                    gameState.setCompletedSequence(gameState.getCompletedSequence() + 1);
 
+                    // Invoke flipCard to flip the last card after the sequence is removed
+                    if (!pile.isEmpty()) {
+                        flipCard(i);
+                    }
 
+                    LoggerFactory.getLogger(GameService.class).info("Removed a complete King-to-Ace sequence");
+                }
+            }
+        }
+    }
 
+    public void distributeCards() {
+        LinkedList<Card> deck = gameState.getDeck();
+
+        if (deck.size() < 10) {
+            throw new IllegalStateException("Not enough cards in the deck to distribute");
+        }
+
+        for (int i = 0; i < 10; i++) {
+            LinkedList<Card> pile = gameState.getPiles().get(i);
+            Card card = deck.removeLast();
+            card.setFaceUp(true);
+            pile.add(card);
+
+        }
+        gameState.setDeck(deck);
+        LoggerFactory.getLogger(GameService.class).info("Distributed cards to piles");
+    }
 }

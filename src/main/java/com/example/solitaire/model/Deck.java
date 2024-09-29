@@ -21,6 +21,7 @@ public class Deck {
                 cards.add(new Card(value));
             }
         }
+
     }
 
     // Method to get the deck of cards
@@ -35,14 +36,12 @@ public class Deck {
 
     public static void main(String[] args) {
         Deck deck = new Deck();
-        deck.shuffleDeck(); // Shuffle the deck before displaying
-
+        deck.shuffleDeck();  //Shuffle the deck before displaying
         // Display all the cards in the deck
         for (Card card : deck.getCards()) {
             System.out.println(card);
         }
 
-        // Optional: Display the total number of cards
         System.out.println("Total number of cards: " + deck.getCards().size()); // Should output 104
     }
 
